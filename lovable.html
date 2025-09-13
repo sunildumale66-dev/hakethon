@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Personalized Study System — Demo</title>
+  <style>
+    :root{
+      --bg:#0f1724; --card:#0b1220; --accent:#6ee7b7; --muted:#94a3b8; --glass: rgba(255,255,255,0.03);
+      --radius:14px; --gap:18px; font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;background:linear-gradient(180deg,#071021 0%, #081224 60%);color:#e6eef8;padding:28px}
+    .container{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr 380px;gap:24px}
+
+    header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+    h1{font-size:20px;margin:0}
+    .sub{color:var(--muted);font-size:13px}
+
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:18px;border-radius:var(--radius);box-shadow:0 6px 18px rgba(3,7,18,0.6);}
+
+    /* Left column */
+    .main{display:flex;flex-direction:column;gap:16px}
+
+    .upload-area{border:1px dashed rgba(255,255,255,0.06);padding:16px;border-radius:12px;display:flex;gap:12px;align-items:center}
+    .upload-area input[type=file]{display:none}
+    .btn{background:var(--accent);color:#022225;padding:10px 12px;border-radius:10px;border:none;cursor:pointer;font-weight:600}
+    .muted{color:var(--muted);font-size:13px}
+
+    .doc-preview{max-height:180px;overflow:auto;padding:12px;background:var(--glass);border-radius:10px;border:1px solid rgba(255,255,255,0.02)}
+
+    /* Assessment */
+    .assess-controls{display:flex;gap:8px;align-items:center}
+    .input, textarea{width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+    textarea{min-height:90px}
+
+    .questions{display:flex;flex-direction:column;gap:12px}
+    .question{background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));padding:12px;border-radius:10px}
+    .option{display:flex;align-items:center;gap:8px;margin-top:6px}
+    .option input{margin-right:8px}
+
+    /* Right column */
+    aside{display:flex;flex-direction:column;gap:16px}
+    .stats{display:flex;gap:12px;align-items:center}
+    .stat{flex:1;padding:12px;border-radius:10px;background:rgba(255,255,255,0.02);text-align:center}
+    .stat h3{margin:0}
+
+    .chart-wrap{height:180px}
+    canvas{width:100%;height:100%}
+
+    footer{grid-column:1/-1;margin-top:14px;color:var(--muted);font-size:13px;text-align:center}
+
+    /* Responsive */
+    @media (max-width:980px){.container{grid-template-columns:1fr;}.card{padding:14px}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>Personalized Study System</h1>
+        <div class="sub">Document processing • Automated assessments • Progress analytics • AI study suggestions</div>
+      </div>
+      <div class="muted">Local demo · No external servers</div>
+    </header>
+
+    <section class="card main">
+      <div class="card">
+        <h2 style="margin:0 0 8px 0">1) Document processing</h2>
+        <div class="muted">Upload text/PDF files and extract content. (PDF text-extraction not included in this static demo.)</div>
+        <div style="height:8px"></div>
+        <div class="upload-area">
+          <label for="file" class="btn">Choose file</label>
+          <input id="file" type="file" accept=".txt,.md,.html" />
+          <div style="flex:1">
+            <div class="muted">Supported: .txt .md .html — The demo reads file text and prepares it for assessment.</div>
+          </div>
+          <button id="clearDoc" class="btn" style="background:#ef7676">Clear</button>
+        </div>
+
+        <div style="height:12px"></div>
+        <div class="doc-preview" id="docPreview">No document loaded.</div>
+      </div>
+
+      <div class="card">
+        <h2 style="margin:0 0 8px 0">2) Automated assessment generation</h2>
+        <div class="muted">Generate quick MCQs from the uploaded document or from custom text.</div>
+        <div style="height:8px"></div>
+        <div class="assess-controls">
+          <input id="numQ" type="number" class="input" min="1" max="20" value="5" style="width:100px;margin-right:6px" />
+          <select id="difficulty" class="input" style="width:140px">
+            <option value="easy">Easy</option>
+            <option value="medium" selected>Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+          <button id="genQuiz" class="btn">Generate MCQs</button>
+          <button id="saveProgress" class="btn" style="background:#7cc0ff">Save Progress</button>
+        </div>
+
+        <div style="height:12px"></div>
+        <div id="questions" class="questions"></div>
+      </div>
+
+      <div class="card">
+        <h2 style="margin:0 0 8px 0">3) Self-assessment & feedback</h2>
+        <div class="muted">Answer the questions and get instant scoring. Progress is stored locally.</div>
+        <div style="height:8px"></div>
+        <button id="submitAnswers" class="btn">Submit Answers</button>
+        <div id="scoreArea" style="margin-top:12px"></div>
+      </div>
+    </section>
+
+    <aside>
+      <div class="card">
+        <h3 style="margin:0 0 8px 0">Analytics</h3>
+        <div class="stats">
+          <div class="stat"><div class="muted">Total Quizzes</div><h3 id="totalQuizzes">0</h3></div>
+          <div class="stat"><div class="muted">Average Score</div><h3 id="avgScore">0%</h3></div>
+        </div>
+        <div style="height:12px"></div>
+        <div class="chart-wrap"><canvas id="progressChart"></canvas></div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin:0 0 8px 0">AI-driven Recommendations</h3>
+        <div class="muted">Quick study plan based on the document content and performance.</div>
+        <div style="height:8px"></div>
+        <textarea id="notes" placeholder="Paste or write short notes / topics here..."></textarea>
+        <div style="height:8px"></div>
+        <button id="getReco" class="btn">Get AI Recommendations</button>
+        <div id="recoArea" style="margin-top:12px"></div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin:0 0 8px 0">Settings</h3>
+        <div class="muted">This demo stores progress in your browser (localStorage).</div>
+        <div style="height:8px"></div>
+        <button id="resetAll" class="btn" style="background:#ffb86b">Reset Data</button>
+      </div>
+    </aside>
+
+    <footer>Built with HTML, CSS & vanilla JS — demo platform. You can download/copy this single-file app and run locally.</footer>
+  </div>
+
+  <script>
+    // --------------------------- Utilities ---------------------------
+    function $(id){return document.getElementById(id)}
+    function cleanText(t){return t.replace(/\s+/g,' ').trim();}
+
+    // --------------------------- Document processing -----------------
+    let docText = '';
+    $('file').addEventListener('change', ev=>{
+      const f = ev.target.files[0];
+      if(!f) return;
+      const reader = new FileReader();
+      reader.onload = e=>{
+        docText = String(e.target.result);
+        $('docPreview').textContent = docText.slice(0,2000) || 'No readable text.';
+      }
+      reader.readAsText(f);
+    });
+    $('clearDoc').addEventListener('click', ()=>{docText=''; $('docPreview').textContent='No document loaded.'; $('file').value='';});
+
+    // --------------------------- Quiz generation --------------------
+    function splitSentences(text){
+      // naive sentence splitter
+      return text.split(/[\.\?\!]+\s+/).map(s=>cleanText(s)).filter(Boolean);
+    }
+
+    function pickDistractors(correct, pool, n=3){
+      const candidates = pool.filter(p=>p.length>20 && Math.abs(p.length-correct.length)>10);
+      shuffle(candidates);
+      return candidates.slice(0,n).map(s=>s.slice(0,120)+'...');
+    }
+
+    function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}}
+
+    function generateMCQs(sourceText, count, difficulty){
+      const sents = splitSentences(sourceText);
+      if(sents.length === 0) return [];
+      // choose longer sentences as potential question stems
+      const candidates = sents.filter(s=>s.length>40);
+      if(candidates.length < Math.max(5,count)) candidates.push(...sents.slice(0,Math.max(0,count-candidates.length)));
+      shuffle(candidates);
+      const pool = sents.slice();
+      const questions = [];
+      for(let i=0;i<count && i<candidates.length;i++){
+        const stem = candidates[i];
+        // for demo: correct answer = a short summary (take first 8-12 words)
+        const words = stem.split(' ').filter(Boolean);
+        const correct = words.slice(0, Math.max(4, Math.min(10, Math.floor(words.length/3)))).join(' ');
+        const distractors = pickDistractors(correct, pool, 3);
+        const opts = [correct, ...distractors];
+        shuffle(opts);
+        questions.push({id: 'q'+i, stem: stem.slice(0,240), options:opts, answer:correct});
+      }
+      return questions;
+    }
+
+    function renderQuestions(list){
+      const cont = $('questions'); cont.innerHTML='';
+      list.forEach((q, idx)=>{
+        const el = document.createElement('div'); el.className='question';
+        el.innerHTML = `<strong>Q${idx+1}.</strong> ${q.stem}`;
+        q.options.forEach((opt)=>{
+          const optWrap = document.createElement('label'); optWrap.className='option';
+          const radio = document.createElement('input'); radio.type='radio'; radio.name=q.id; radio.value=opt;
+          optWrap.appendChild(radio);
+          const span = document.createElement('span'); span.textContent = opt;
+          optWrap.appendChild(span);
+          el.appendChild(optWrap);
+        });
+        cont.appendChild(el);
+      });
+    }
+
+    $('genQuiz').addEventListener('click', ()=>{
+      const num = parseInt($('numQ').value) || 5;
+      const diff = $('difficulty').value;
+      const source = docText || $('notes').value || '';
+      if(!source.trim()){alert('No source text found. Paste notes or upload a text file.'); return}
+      const qs = generateMCQs(source, num, diff);
+      window.currentQuiz = qs;
+      renderQuestions(qs);
+    });
+
+    // --------------------------- Submit & scoring -------------------
+    function gradeCurrentQuiz(){
+      const qs = window.currentQuiz || [];
+      if(qs.length===0) return null;
+      let correct=0; let total=qs.length; const details = [];
+      qs.forEach(q=>{
+        const sel = document.querySelector(`input[name="${q.id}"]:checked`);
+        const chosen = sel ? sel.value : null;
+        const ok = chosen && chosen.trim()===q.answer.trim();
+        if(ok) correct++;
+        details.push({id:q.id,ok,chosen,answer:q.answer});
+      });
+      const percent = Math.round((correct/total)*100);
+      return {correct,total,percent,details};
+    }
+
+    $('submitAnswers').addEventListener('click', ()=>{
+      const res = gradeCurrentQuiz();
+      if(!res){alert('No active quiz. Generate one first.');return}
+      $('scoreArea').innerHTML = `<div class="card" style="padding:12px;margin-top:6px;background:rgba(0,0,0,0.2)"><strong>Score: ${res.correct}/${res.total} (${res.percent}%)</strong><div class=\"muted\" style=\"margin-top:6px\">Answers saved to progress.</div></div>`;
+      saveQuizResult(res);
+      updateAnalytics();
+    });
+
+    // --------------------------- Progress storage --------------------
+    function loadProgress(){
+      try{const raw = localStorage.getItem('study_progress'); return raw?JSON.parse(raw):{quizzes:[]}}catch(e){return {quizzes:[]}}}
+    function storeProgress(data){localStorage.setItem('study_progress', JSON.stringify(data));}
+
+    function saveQuizResult(result){
+      const data = loadProgress();
+      data.quizzes.push({date:new Date().toISOString(),score:result.percent,correct:result.correct,total:result.total});
+      storeProgress(data);
+    }
+
+    function updateAnalytics(){
+      const data = loadProgress();
+      const scores = data.quizzes.map(q=>q.score);
+      $('totalQuizzes').textContent = data.quizzes.length;
+      $('avgScore').textContent = scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length)+'%':'0%';
+      drawChart(scores);
+    }
+
+    // --------------------------- Simple chart (vanilla) ------------
+    function drawChart(scores){
+      const c = $('progressChart');
+      c.width = c.clientWidth*2; c.height = c.clientHeight*2;
+      const ctx = c.getContext('2d'); ctx.scale(2,2);
+      // background
+      ctx.clearRect(0,0,c.clientWidth,c.clientHeight);
+      ctx.fillStyle = 'rgba(255,255,255,0.03)'; ctx.fillRect(0,0,c.clientWidth,c.clientHeight);
+      const w = c.clientWidth; const h = c.clientHeight;
+      if(scores.length===0){
+        ctx.fillStyle='rgba(255,255,255,0.2)'; ctx.font='12px sans-serif'; ctx.fillText('No quiz data yet', 12, 20); return}
+      const max = 100;
+      const gap = 8; const barW = Math.max(10, (w - (scores.length+1)*gap)/scores.length);
+      scores.forEach((s,i)=>{
+        const barH = (s/max)*(h-30);
+        const x = gap + i*(barW+gap);
+        const y = h - barH - 10;
+        ctx.fillStyle='rgba(110,231,183,0.9)'; ctx.fillRect(x,y,barW,barH);
+        ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.font='11px sans-serif'; ctx.fillText(s+'%', x, h-2);
+      });
+    }
+
+    // --------------------------- Recommendations (heuristic AI) ----
+    function getRecommendationsFromText(text, performanceScore){
+      // Heuristic rules: find repeating keywords and weak areas
+      const wordCounts = {};
+      const words = text.toLowerCase().replace(/[^a-z0-9 ]+/g,' ').split(/\s+/).filter(Boolean);
+      words.forEach(w=>{if(w.length>3){wordCounts[w]=(wordCounts[w]||0)+1}});
+      const sorted = Object.entries(wordCounts).sort((a,b)=>b[1]-a[1]);
+      const topTerms = sorted.slice(0,6).map(t=>t[0]);
+      const recs = [];
+      if(performanceScore !== null && performanceScore < 60){
+        recs.push('You scored below 60% — focus on active recall, spaced repetition, and small daily quizzes (15–25 mins).');
+      } else if(performanceScore !== null){
+        recs.push('Your average score is good — add mixed practice and timed quizzes to improve retention.');
+      }
+      if(topTerms.length>0) recs.push('Top topics found: '+topTerms.join(', '));
+      // Create a 7-day micro-plan
+      recs.push('7-day micro-plan: Day 1 — read & highlight; Day 2 — make 10 flashcards; Day 3 — take short quiz; Day 4 — teach the topic to a friend; Day 5 — mixed practice; Day 6 — rest + quick review; Day 7 — full self-test.');
+      recs.push('Suggested resources: short videos (5–12 min), concise notes, and 10-question daily quizzes.');
+      return recs;
+    }
+
+    $('getReco').addEventListener('click', ()=>{
+      const text = ($('notes').value || docText || '');
+      if(!text.trim()){alert('No text found. Paste notes or upload a document.');return}
+      const data = loadProgress();
+      const scores = data.quizzes.map(q=>q.score);
+      const avg = scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):null;
+      const recs = getRecommendationsFromText(text, avg);
+      $('recoArea').innerHTML = '<ul style="margin:6px 0 0 18px;color:var(--muted)">'+recs.map(r=>'<li>'+r+'</li>').join('')+'</ul>';
+    });
+
+    // --------------------------- Persistence controls ----------------
+    $('saveProgress').addEventListener('click', ()=>{
+      const res = gradeCurrentQuiz();
+      if(!res){alert('No active quiz to save.');return}
+      saveQuizResult(res);
+      updateAnalytics();
+      alert('Progress saved locally.');
+    });
+
+    $('resetAll').addEventListener('click', ()=>{ if(confirm('Reset all local progress?')){localStorage.removeItem('study_progress'); updateAnalytics(); alert('Reset done.');}});
+
+    // --------------------------- Init ------------------------------
+    window.addEventListener('load', ()=>{ updateAnalytics(); });
+
+    // Expose small helper to download the page as HTML
+    function downloadSelf(){ const a=document.createElement('a'); a.href='data:text/html;charset=utf-8,'+encodeURIComponent(document.documentElement.outerHTML); a.download='personalized-study-system.html'; document.body.appendChild(a); a.click(); a.remove(); }
+    // attach to global for user convenience
+    window.downloadSelf = downloadSelf;
+  </script>
+</body>
+</html>
